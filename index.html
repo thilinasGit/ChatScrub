@@ -11,11 +11,11 @@
     <meta property="og:description" content="Clean up transcripts and protect privacy instantly. No data ever leaves your device.">
     <meta property="og:type" content="website">
 
-    <!-- React & ReactDOM -->
+    <!-- React & ReactDOM (Using Production Builds) -->
     <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     
-    <!-- Babel -->
+    <!-- Babel for Browser JSX Translation -->
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     
     <!-- Tailwind CSS -->
@@ -30,6 +30,8 @@
         body {
             background-color: #f8fafc;
             font-family: 'Inter', -apple-system, sans-serif;
+            margin: 0;
+            padding: 0;
         }
         .font-mono {
             font-family: 'JetBrains Mono', monospace;
@@ -44,6 +46,12 @@
             background: #cbd5e1; 
             border-radius: 10px;
         }
+        /* Fix for mobile height issues */
+        .app-container {
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
     </style>
 </head>
 <body>
@@ -53,14 +61,12 @@
         const { useState, useEffect, useMemo } = React;
 
         const App = () => {
-            // Load initial state from localStorage or defaults
             const [inputText, setInputText] = useState("");
             const [formattedText, setFormattedText] = useState("");
             const [timeOption, setTimeOption] = useState(() => localStorage.getItem('scrub_time_opt') || "remove");
             const [nameOption, setNameOption] = useState(() => localStorage.getItem('scrub_name_opt') || "keep");
             const [showCopyFeedback, setShowCopyFeedback] = useState(false);
 
-            // Persist preferences
             useEffect(() => {
                 localStorage.setItem('scrub_time_opt', timeOption);
                 localStorage.setItem('scrub_name_opt', nameOption);
@@ -76,7 +82,9 @@
                 return chunks.map(chunk => {
                     const cleanChunk = chunk.trim();
                     if (!cleanChunk) return null;
+                    
                     const match = cleanChunk.match(/^\[(.*?)\] (.*?): (.*)$/s);
+                    
                     if (match) {
                         const fullTimestamp = match[1];
                         const name = match[2];
@@ -104,19 +112,24 @@
 
                 return messages.map(msg => {
                     if (msg.isSystem) return msg.text;
+                    
                     let ts = "";
                     if (timeOption === 'original') ts = `[${msg.originalTimestamp}] `;
                     else if (timeOption === 'date') ts = `[${msg.date}] `;
                     else if (timeOption === 'time') ts = `[${msg.time}] `;
 
-                    let name = "";
-                    if (nameOption === 'keep') name = `${msg.originalName}: `;
+                    let nameStr = "";
+                    if (nameOption === 'keep') nameStr = `${msg.originalName}: `;
                     else if (nameOption === 'mask') {
                         const n = msg.originalName;
-                        name = n.length <= 2 ? `${n}: ` : `${n[0]}...${n[n.length-1]}: `;
-                    } else if (nameOption === 'substitute') name = `${substitutionMap[msg.originalName]}: `;
+                        nameStr = n.length <= 2 ? `${n}: ` : `${n[0]}...${n[n.length-1]}: `;
+                    } else if (nameOption === 'substitute') {
+                        nameStr = `${substitutionMap[msg.originalName]}: `;
+                    } else if (nameOption === 'remove') {
+                        nameStr = "";
+                    }
 
-                    return `${ts}${name}${msg.message}`;
+                    return `${ts}${nameStr}${msg.message}`;
                 });
             }, [inputText, timeOption, nameOption]);
 
@@ -129,23 +142,27 @@
                 el.value = formattedText;
                 document.body.appendChild(el);
                 el.select();
-                document.execCommand('copy');
+                try {
+                    document.execCommand('copy');
+                    setShowCopyFeedback(true);
+                    setTimeout(() => setShowCopyFeedback(false), 2000);
+                } catch (err) {
+                    console.error('Copy failed');
+                }
                 document.body.removeChild(el);
-                setShowCopyFeedback(true);
-                setTimeout(() => setShowCopyFeedback(false), 2000);
             };
 
             return (
-                <div className="min-h-screen flex flex-col">
+                <div className="app-container">
                     <nav className="bg-white border-b border-gray-200 py-4 px-6 sticky top-0 z-50">
                         <div className="max-w-7xl mx-auto flex flex-row justify-between items-center">
                             <div className="flex items-center gap-3">
-                                <div className="bg-green-600 p-1.5 md:p-2 rounded-xl">
+                                <div className="bg-green-600 p-1.5 md:p-2 rounded-xl shadow-sm">
                                     <i data-lucide="shield-check" className="text-white w-5 h-5 md:w-6 md:h-6"></i>
                                 </div>
                                 <div>
                                     <h1 className="text-lg md:text-xl font-bold text-gray-900 leading-none">ChatScrub</h1>
-                                    <span className="text-[10px] md:text-xs font-bold text-green-600 uppercase tracking-tighter">Client-Side Only</span>
+                                    <span className="text-[10px] md:text-xs font-bold text-green-600 uppercase tracking-tighter">Secure Browser Tool</span>
                                 </div>
                             </div>
                             <div className="flex items-center gap-2 md:gap-3">
@@ -171,26 +188,27 @@
                             <div>
                                 <h2 className="text-2xl md:text-3xl font-bold mb-3">Professional Chat Formatting</h2>
                                 <p className="text-green-50 text-sm md:text-base opacity-90 mb-6 leading-relaxed">
-                                    Securely clean and anonymize WhatsApp logs. Perfect for sharing conversation snippets in documents or public forums without the clutter.
+                                    Clean and anonymize WhatsApp logs locally in your browser. 
+                                    <b> No data ever leaves your device.</b>
                                 </p>
                                 <div className="hidden sm:flex flex-wrap gap-3">
                                     <div className="flex items-center gap-2 bg-white/10 px-3 py-1.5 rounded-full text-xs">
-                                        <i data-lucide="lock" className="w-3 h-3 text-green-300"></i> Browser Processed
+                                        <i data-lucide="lock" className="w-3 h-3 text-green-300"></i> Local Only
                                     </div>
                                     <div className="flex items-center gap-2 bg-white/10 px-3 py-1.5 rounded-full text-xs">
-                                        <i data-lucide="zap" className="w-3 h-3 text-green-300"></i> Instant Preview
+                                        <i data-lucide="zap" className="w-3 h-3 text-green-300"></i> Zero Logs
                                     </div>
                                 </div>
                             </div>
                             <div className="bg-white/10 rounded-xl p-5 backdrop-blur-sm border border-white/20">
                                 <h3 className="text-sm font-bold mb-3 flex items-center gap-2">
-                                    <i data-lucide="info" className="w-4 h-4"></i> Quick Instructions:
+                                    <i data-lucide="info" className="w-4 h-4"></i> How to use:
                                 </h3>
                                 <ol className="space-y-2 text-xs md:text-sm list-decimal list-inside opacity-90">
-                                    <li>Copy your chat text from WhatsApp.</li>
-                                    <li>Paste it into the <b>Input</b> area below.</li>
-                                    <li>Use the <b>Options</b> to strip dates or hide names.</li>
-                                    <li>Click <b>Copy Result</b> to save your clean text.</li>
+                                    <li>Copy chat text from WhatsApp.</li>
+                                    <li>Paste it into the <b>Raw Input</b> box.</li>
+                                    <li>Adjust <b>Formatting Options</b>.</li>
+                                    <li>Click <b>Copy</b> to get your clean transcript.</li>
                                 </ol>
                             </div>
                         </section>
@@ -221,7 +239,7 @@
                                     {[
                                         { id: 'keep', label: 'Show All' },
                                         { id: 'remove', label: 'Remove' },
-                                        { id: 'mask', label: 'Mask Initials' },
+                                        { id: 'mask', label: 'Mask' },
                                         { id: 'substitute', label: 'Alias' },
                                     ].map(opt => (
                                         <button 
@@ -283,20 +301,30 @@
 
                     <footer className="bg-white border-t border-gray-100 py-8 px-6 mt-auto">
                         <div className="max-w-7xl mx-auto flex flex-col items-center gap-2 text-gray-400 text-xs text-center">
-                            <p className="font-medium text-gray-500">Security Note: No data is sent to any server.</p>
-                            <p>© 2026 ChatScrub • Thilina C </p>
+                            <p className="font-medium text-gray-500 italic">"Privacy is not an option, and it shouldn't be the price we pay for just getting stuff done."</p>
+                            <p>© 2026 ChatScrub • Developed by Thilina C.</p>
                         </div>
                     </footer>
                 </div>
             );
         };
 
-        const root = ReactDOM.createRoot(document.getElementById('root'));
-        root.render(<App />);
+        const mountApp = () => {
+            const rootElement = document.getElementById('root');
+            if (rootElement) {
+                const root = ReactDOM.createRoot(rootElement);
+                root.render(<App />);
+                setTimeout(() => {
+                    if (window.lucide) window.lucide.createIcons();
+                }, 200);
+            }
+        };
 
-        setTimeout(() => {
-            lucide.createIcons();
-        }, 150);
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', mountApp);
+        } else {
+            mountApp();
+        }
     </script>
 </body>
 </html>
